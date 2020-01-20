@@ -1,0 +1,72 @@
+xdg-desktop-portal 0.5
+======================
+
+* The notification portal now supports non-exported actions
+
+* An Account portal for basic user information has been added
+
+* All portal interface now have a version property. Currently,
+  all interfaces are at version 1
+
+* The file chooser portal was forgetting to make files created
+  for SaveFile writable. This has been fixed
+
+* Translation updates:
+ Czech
+ Polish
+ Swedish
+
+xdg-desktop-portal 0.4
+======================
+
+* No longer rely on cgroups to find the app id
+
+* Fix handling of mime type filters in the file chooser portal
+
+* Translation updates:
+ Chinese
+ Czech
+ German
+ Serbian
+
+
+xdg-desktop-portal 0.3
+======================
+
+* open-uri: Allow configuring threshold
+
+* open-uri: Use fallback applications when needed
+
+* Translation updates:
+ Brazilian Portuguese
+ Hungarian
+ Slovak
+ Ukrainian
+
+
+xdg-desktop-portal 0.2
+======================
+
+* Add internationalization support
+
+* Add Qt annotations
+
+* New portal APIs:
+ - org.freedesktop.portal.Device
+
+* Translation updates:
+ Polish
+
+
+Initial release 0.1
+===================
+
+Included portal APIs:
+ * org.freedesktop.portal.FileChooser
+ * org.freedesktop.portal.Print
+ * org.freedesktop.portal.OpenURI
+ * org.freedesktop.portal.Screenshot
+ * org.freedesktop.portal.Inhibit
+ * org.freedesktop.portal.Notification
+ * org.freedesktop.portal.NetworkMonitor
+ * org.freedesktop.portal.ProxyResolver
