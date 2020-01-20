@@ -31,16 +31,13 @@
         @handle: Object path to export the Request object at
         @app_id: App id of the application
         @title: Title for the app chooser dialog
-        @parent_window: Identifier for the application window
+        @parent_window: Identifier for the application window, see <link linkend="parent_window">Common Conventions</link>
         @choices: App ids of applications to let the user choose from
         @options: Vardict with optional further information
         @response: Numeric response
         @results: Vardict with the results of the call
 
         Presents a list of applications to the user to choose one.
-
-        The @parent_window identifier must be of the form "x11:$XID" for an X11
-        window. Support for other window systems may be added in the future.
 
         Supported keys in the @options vardict include:
         <variablelist>
@@ -51,6 +48,19 @@
           <varlistentry>
             <term>modal b</term>
             <listitem><para>Whether to make the dialog modal. Defaults to yes.</para></listitem>
+          </varlistentry>
+          <varlistentry>
+            <term>content_type s</term>
+            <listitem><para>The content type to choose an application for.</para></listitem>
+          </varlistentry>
+          <varlistentry>
+            <term>uri s</term>
+            <listitem><para>The uri to choose an application for.</para></listitem>
+          </varlistentry>
+          <varlistentry>
+            <term>filename s</term>
+            <listitem><para>The filename to choose an application for. Note that this
+               is just a basename, without a path.</para></listitem>
           </varlistentry>
         </variablelist>
 

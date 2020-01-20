@@ -20,6 +20,7 @@
  */
 
 #include "request.h"
+#include "xdp-utils.h"
 
 #include <string.h>
 
@@ -113,10 +114,10 @@ request_finalize (GObject *object)
 
   g_clear_object (&request->impl_request);
 
-  g_free (request->app_id);
   g_free (request->sender);
   g_free (request->id);
   g_mutex_clear (&request->mutex);
+  xdp_app_info_unref (request->app_info);
 
   G_OBJECT_CLASS (request_parent_class)->finalize (object);
 }
@@ -153,26 +154,159 @@ request_authorize_callback (GDBusInterfaceSkeleton *interface,
   return TRUE;
 }
 
+/* This is a bit ugly - we need to know where the options vardict is
+ * in the parameters for each request. Instead of inventing some
+ * complicated mechanism for each implementation to provide that
+ * information, just hardcode it here for now.
+ *
+ * Note that the pointer returned by this function is good to use
+ * as long as the invocation object exists, since it points at data
+ * in the parameters variant.
+ */
+static const char *
+get_token (GDBusMethodInvocation *invocation)
+{
+  const char *interface;
+  const char *method;
+  GVariant *parameters;
+  g_autoptr(GVariant) options = NULL;
+  const char *token = NULL;
+
+  interface = g_dbus_method_invocation_get_interface_name (invocation);
+  method = g_dbus_method_invocation_get_method_name (invocation);
+  parameters = g_dbus_method_invocation_get_parameters (invocation);
+
+  if (strcmp (interface, "org.freedesktop.portal.Account") == 0)
+    {
+      options = g_variant_get_child_value (parameters, 1);
+    }
+  else if (strcmp (interface, "org.freedesktop.portal.Device") == 0)
+    {
+      options = g_variant_get_child_value (parameters, 2);
+    }
+  else if (strcmp (interface, "org.freedesktop.portal.Email") == 0)
+    {
+      options = g_variant_get_child_value (parameters, 1);
+    }
+  else if (strcmp (interface, "org.freedesktop.portal.FileChooser") == 0)
+    {
+      options = g_variant_get_child_value (parameters, 2);
+    }
+  else if (strcmp (interface, "org.freedesktop.portal.Inhibit") == 0)
+    {
+      if (strcmp (method, "Inhibit") == 0)
+        options = g_variant_get_child_value (parameters, 2);
+      else if (strcmp (method, "CreateMonitor") == 0)
+        options = g_variant_get_child_value (parameters, 1);
+    }
+  else if (strcmp (interface, "org.freedesktop.portal.NetworkMonitor") == 0)
+    {
+      // no methods
+    }
+  else if (strcmp (interface, "org.freedesktop.portal.Notification") == 0)
+    {
+      // no request objects
+    }
+  else if (strcmp (interface, "org.freedesktop.portal.OpenURI") == 0)
+    {
+      options = g_variant_get_child_value (parameters, 2);
+    }
+  else if (strcmp (interface, "org.freedesktop.portal.Print") == 0)
+    {
+      if (strcmp (method, "Print") == 0)
+        options = g_variant_get_child_value (parameters, 3);
+      else if (strcmp (method, "PreparePrint") == 0)
+        options = g_variant_get_child_value (parameters, 4);
+    }
+  else if (strcmp (interface, "org.freedesktop.portal.ProxyResolver") == 0)
+    {
+      // no request objects
+    }
+  else if (strcmp (interface, "org.freedesktop.portal.Screenshot") == 0)
+    {
+      options = g_variant_get_child_value (parameters, 1);
+    }
+  else if (strcmp (interface, "org.freedesktop.portal.ScreenCast") == 0)
+    {
+      if (strcmp (method, "CreateSession") == 0 )
+        {
+          options = g_variant_get_child_value (parameters, 0);
+        }
+      else if (strcmp (method, "SelectSources") == 0)
+        {
+          options = g_variant_get_child_value (parameters, 1);
+        }
+      else if (strcmp (method, "Start") == 0)
+        {
+          options = g_variant_get_child_value (parameters, 2);
+        }
+      else
+        {
+          g_warning ("Support for %s::%s missing in %s",
+                     interface, method, G_STRLOC);
+        }
+    }
+  else if (strcmp (interface, "org.freedesktop.portal.RemoteDesktop") == 0)
+    {
+      if (strcmp (method, "CreateSession") == 0 )
+        {
+          options = g_variant_get_child_value (parameters, 0);
+        }
+      else if (strcmp (method, "SelectDevices") == 0)
+        {
+          options = g_variant_get_child_value (parameters, 1);
+        }
+      else if (strcmp (method, "Start") == 0)
+        {
+          options = g_variant_get_child_value (parameters, 2);
+        }
+      else
+        {
+          g_warning ("Support for %s::%s missing in %s",
+                     interface, method, G_STRLOC);
+        }
+    }
+  else
+    {
+      g_print ("Support for %s missing in " G_STRLOC, interface);
+    }
+
+  if (options)
+    g_variant_lookup (options, "handle_token", "&s", &token);
+
+  return token ? token : "t";
+}
+
 void
-request_init_invocation (GDBusMethodInvocation  *invocation, const char *app_id)
+request_init_invocation (GDBusMethodInvocation *invocation, XdpAppInfo *app_info)
 {
   Request *request;
   guint32 r;
   char *id = NULL;
+  const char *token;
+  g_autofree char *sender = NULL;
+  int i;
 
   request = g_object_new (request_get_type (), NULL);
-  request->app_id = g_strdup (app_id);
   request->sender = g_strdup (g_dbus_method_invocation_get_sender (invocation));
+  request->app_info = xdp_app_info_ref (app_info);
+
+  token = get_token (invocation);
+  sender = g_strdup (request->sender + 1);
+  for (i = 0; sender[i]; i++)
+    if (sender[i] == '.')
+      sender[i] = '_';
+
+  id = g_strdup_printf ("/org/freedesktop/portal/desktop/request/%s/%s", sender, token);
 
   G_LOCK (requests);
 
-  r = g_random_int ();
-  do
+  while (g_hash_table_lookup (requests, id) != NULL)
     {
+      r = g_random_int ();
       g_free (id);
-      id = g_strdup_printf ("/org/freedesktop/portal/desktop/request/%u", r);
+      id = g_strdup_printf ("/org/freedesktop/portal/desktop/request/%s/%s/%u", sender, token, r);
     }
-  while (g_hash_table_lookup (requests, id) != NULL);
 
   request->id = id;
   g_hash_table_insert (requests, id, request);

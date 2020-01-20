@@ -30,6 +30,7 @@
 #include "xdp-utils.h"
 #include "xdp-dbus.h"
 #include "request.h"
+#include "call.h"
 #include "documents.h"
 #include "permissions.h"
 #include "file-chooser.h"
@@ -42,6 +43,10 @@
 #include "inhibit.h"
 #include "device.h"
 #include "account.h"
+#include "email.h"
+#include "screen-cast.h"
+#include "remote-desktop.h"
+#include "trash.h"
 
 static GMainLoop *loop = NULL;
 
@@ -50,7 +55,7 @@ static gboolean opt_replace;
 
 static GOptionEntry entries[] = {
   { "verbose", 'v', 0, G_OPTION_ARG_NONE, &opt_verbose, "Print debug information during command processing", NULL },
-  { "replace", 'r', 0, G_OPTION_ARG_NONE, &opt_replace, "Replace", NULL },
+  { "replace", 'r', 0, G_OPTION_ARG_NONE, &opt_replace, "Replace a running instance", NULL },
   { NULL }
 };
 
@@ -273,16 +278,45 @@ find_portal_implementation (const char *interface)
 }
 
 static gboolean
+method_needs_request (GDBusMethodInvocation *invocation)
+{
+  const char *interface;
+  const char *method;
+
+  interface = g_dbus_method_invocation_get_interface_name (invocation);
+  method = g_dbus_method_invocation_get_method_name (invocation);
+
+  if (strcmp (interface, "org.freedesktop.portal.ScreenCast") == 0)
+    {
+      if (strcmp (method, "OpenPipeWireRemote") == 0)
+        return FALSE;
+      else
+        return TRUE;
+    }
+  else if (strcmp (interface, "org.freedesktop.portal.RemoteDesktop") == 0)
+    {
+      if (strstr (method, "Notify") == method)
+        return FALSE;
+      else
+        return TRUE;
+    }
+  else
+    {
+      return TRUE;
+    }
+}
+
+static gboolean
 authorize_callback (GDBusInterfaceSkeleton *interface,
                     GDBusMethodInvocation  *invocation,
                     gpointer                user_data)
 {
-  g_autofree char *app_id;
+  g_autoptr(XdpAppInfo) app_info = NULL;
 
   g_autoptr(GError) error = NULL;
 
-  app_id = xdp_invocation_lookup_app_id_sync (invocation, NULL, &error);
-  if (app_id == NULL)
+  app_info = xdp_invocation_lookup_app_info_sync (invocation, NULL, &error);
+  if (app_info == NULL)
     {
       g_dbus_method_invocation_return_error (invocation,
                                              G_DBUS_ERROR,
@@ -291,7 +325,10 @@ authorize_callback (GDBusInterfaceSkeleton *interface,
       return FALSE;
     }
 
-  request_init_invocation (invocation, app_id);
+  if (method_needs_request (invocation))
+    request_init_invocation (invocation, app_info);
+  else
+    call_init_invocation (invocation, app_info);
 
   return TRUE;
 }
@@ -320,6 +357,13 @@ export_portal_implementation (GDBusConnection *connection,
 }
 
 static void
+peer_died_cb (const char *name)
+{
+  close_requests_for_sender (name);
+  close_sessions_for_sender (name);
+}
+
+static void
 on_bus_acquired (GDBusConnection *connection,
                  const gchar     *name,
                  gpointer         user_data)
@@ -327,12 +371,13 @@ on_bus_acquired (GDBusConnection *connection,
   PortalImplementation *implementation;
   g_autoptr(GError) error = NULL;
 
-  xdp_connection_track_name_owners (connection);
+  xdp_connection_track_name_owners (connection, peer_died_cb);
   init_document_proxy (connection);
   init_permission_store (connection);
 
   export_portal_implementation (connection, network_monitor_create (connection));
   export_portal_implementation (connection, proxy_resolver_create (connection));
+  export_portal_implementation (connection, trash_create (connection));
 
   implementation = find_portal_implementation ("org.freedesktop.impl.portal.FileChooser");
   if (implementation != NULL)
@@ -373,6 +418,23 @@ on_bus_acquired (GDBusConnection *connection,
   if (implementation != NULL)
     export_portal_implementation (connection,
                                   account_create (connection, implementation->dbus_name));
+
+  implementation = find_portal_implementation ("org.freedesktop.impl.portal.Email");
+  if (implementation != NULL)
+    export_portal_implementation (connection,
+                                  email_create (connection, implementation->dbus_name));
+
+#if HAVE_PIPEWIRE
+  implementation = find_portal_implementation ("org.freedesktop.impl.portal.ScreenCast");
+  if (implementation != NULL)
+    export_portal_implementation (connection,
+                                  screen_cast_create (connection, implementation->dbus_name));
+
+  implementation = find_portal_implementation ("org.freedesktop.impl.portal.RemoteDesktop");
+  if (implementation != NULL)
+    export_portal_implementation (connection,
+                                  remote_desktop_create (connection, implementation->dbus_name));
+#endif
 }
 
 static void
@@ -407,9 +469,23 @@ main (int argc, char *argv[])
   /* Avoid even loading gvfs to avoid accidental confusion */
   g_setenv ("GIO_USE_VFS", "local", TRUE);
 
+  /* Avoid pointless and confusing recursion */
+  g_unsetenv ("GTK_USE_PORTAL");
+
   g_set_printerr_handler (printerr_handler);
 
   context = g_option_context_new ("- desktop portal");
+  g_option_context_set_summary (context,
+      "A portal service for flatpak and other desktop containment frameworks.");
+  g_option_context_set_description (context,
+      "xdg-desktop-portal works by exposing D-Bus interfaces known as portals\n"
+      "under the well-known name org.freedesktop.portal.Desktop and object\n"
+      "path /org/freedesktop/portal/desktop.\n"
+      "\n"
+      "Documentation for the available D-Bus interfaces can be found at\n"
+      "https://flatpak.github.io/xdg-desktop-portal/portal-docs.html\n"
+      "\n"
+      "Please report issues at https://github.com/flatpak/xdg-desktop-portal/issues");
   g_option_context_add_main_entries (context, entries, NULL);
   if (!g_option_context_parse (context, &argc, &argv, &error))
     {

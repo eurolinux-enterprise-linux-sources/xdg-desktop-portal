@@ -31,11 +31,13 @@
       use them to format your output, then use org.freedesktop.portal.Print.Print()
       to print the formatted document. It is expected that high-level toolkit
       APIS such as GtkPrintOperation will hide most of this complexity.
+
+      This documentation describes version 1 of this interface.
   -->
   <interface name="org.freedesktop.portal.Print">
     <!--
         Print:
-        @parent_window: Identifier for the application window
+        @parent_window: Identifier for the application window, see <link linkend="parent_window">Common Conventions</link>
         @title: Title for the print dialog
         @fd: File descriptor for reading the content to print
         @options: Vardict with optional further information
@@ -47,9 +49,6 @@
         This ensures that sandboxed applications only print files that they have
         access to.
 
-        The @parent_window identifier must be of the form "x11:$XID" for an X11
-        window. Support for other window systems may be added in the future.
-
         If a valid token is present in the @options, then this call will print
         with the settings from the Print call that the token refers to. If
         no token is present, then a print dialog will be presented to the user.
@@ -59,6 +58,14 @@
 
         Supported keys in the @options vardict:
         <variablelist>
+          <varlistentry>
+            <term>handle_token s</term>
+            <listitem><para>
+              A string that will be used as the last element of the @handle. Must be a valid
+              object path element. See the #org.freedesktop.portal.Request documentation for
+              more information about the @handle.
+            </para></listitem>
+          </varlistentry>
           <varlistentry>
             <term>modal b</term>
             <listitem><para>
@@ -74,6 +81,7 @@
         </variablelist>
     -->
     <method name="Print">
+      <annotation name="org.gtk.GDBus.C.UnixFD" value="true"/>
       <arg type="s" name="parent_window" direction="in"/>
       <arg type="s" name="title" direction="in"/>
       <arg type="h" name="fd" direction="in"/>
@@ -82,7 +90,7 @@
     </method>
     <!--
         PreparePrint:
-        @parent_window: Identifier for the application window
+        @parent_window: Identifier for the application window, see <link linkend="parent_window">Common Conventions</link>
         @title: Title for the print dialog
         @settings: Serialized print settings
         @page_setup: Serialized page setup
@@ -92,11 +100,16 @@
         Presents a print dialog to the user and returns print settings
         and page setup.
 
-        The @parent_window identifier must be of the form "x11:$XID" for an X11
-        window. Support for other window systems may be added in the future.
-
         Supported keys in the @options vardict:
         <variablelist>
+          <varlistentry>
+            <term>handle_token s</term>
+            <listitem><para>
+              A string that will be used as the last element of the @handle. Must be a valid
+              object path element. See the #org.freedesktop.portal.Request documentation for
+              more information about the @handle.
+            </para></listitem>
+          </varlistentry>
           <varlistentry>
             <term>modal b</term>
             <listitem><para>

@@ -1,3 +1,130 @@
+xdg-desktop-portal 1.0.2
+========================
+
+* networkmonitor: Fix several issues
+* inhibit: Add session state monitoring
+
+xdg-desktop-portal 1.0.1
+========================
+
+* networkmonitor: Add GetStatus and CanReach methods
+* Unset GTK_USE_PORTAL
+* Add a portal for moving files to the trash
+* Fix an inode leak in the document portal
+
+xdg-desktop-portal 1.0
+======================
+
+* screenshot: Add a color picker api
+* screencast: Bump the pipewire dependency to 0.2.1
+* Improve --help output
+* Small documentation improvements
+
+xdg-desktop-portal 0.99
+=======================
+
+* The NetworkMonitor portal API has been changed to allow access control
+* The Proxy and NetworkMonitor portals only respond to requests from
+  sandboxes with network access
+* The flatpak portal is now documented
+
+xdg-desktop-portal 0.11
+=======================
+
+* Add initial support for Snap packages.
+* Fix memory leaks when ownership of bus names changes.
+* Include docs for the session, remote desktop and screencast portals.
+* document-portal: Be more flexible validating apps' IDs.
+* document-portal: Be more strict when checking & granting file access.
+* file-chooser: Fix crash with unitialized data in the save dialog.
+* open-uri: Don't ever skip showing the dialog if a threshold is set.
+* open-uri: Don't register http: URIs for sandboxed handlers.
+* remote-desktop: Use the correct device type values.
+* screencast: Fix synchronization issue with PipeWire.
+
+* Translation updates
+ Chinese (Taiwan)
+ Spanish
+
+xdg-desktop-portal 0.10
+=======================
+
+This version of xdg-desktop-portal contains the xdg-document-portal
+that used to be shipped by flatpak. The code was moved to
+xdg-desktop-portal as a first step towards being used by
+snappy. Additionally having the two related portals delivered together
+makes it easier to implement new features that rely on changes to
+both portals.
+
+The two versions of the document portal are fully compatible, but the
+package files will conflict with older versions of flatpak, so
+packagers will have to pick one version. Following this there will be
+a new release of unstable flatpak with the document portal removed,
+and a release of the stable branch (0.10) that has a configure
+option to disable the document portal.
+
+Additionally, this release contains a new screencast and remote
+desktop portal based on PipeWire.
+
+Major changes in this versions:
+
+ * Import permission store from flatpak
+ * Import document portal from flatpak
+ * Add remote desktop portal
+ * Add screencast portal
+ * Add "interactive" mode to screenshot portal
+ * file-chooser: Don't return document paths for paths the application has direct access to
+ * Handle newer version of bubblewrap
+ * New abstraction for application info, supporting multiple sandbox technologies
+ * Add basic test suite
+
+xdg-desktop-portal 0.9
+======================
+
+* Install pkg-config files into datadir
+
+* Avoid a race in the portal APIs
+
+* Change the email portal to take fds
+
+* Translation updates
+ Galicican
+ Indonesian
+ Turkish
+
+
+xdg-desktop-portal 0.8
+======================
+
+* Update po files
+
+xdg-desktop-portal 0.7
+======================
+
+* In the OpenURI portal, send the content-type and filename to the appchooser
+
+* Stop handling file: uris in the OpenURI method of the OpenURI portal
+
+* Add an OpenFile method for local files to the OpenURI portal
+
+* Bug fixes in the notification portal
+
+* Translation updates:
+ Czech
+ Italian
+
+xdg-desktop-portal 0.6
+======================
+
+* A portal for sending email has been added
+
+* The OpenURI portal has be made a bit more permissive.
+  It will now directly use the system default for "safe"
+  schemes such as http, and local directories.
+
+* Translation updates:
+ French
+
 xdg-desktop-portal 0.5
 ======================
 
